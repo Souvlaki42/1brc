@@ -4,7 +4,7 @@
 
 This is my implementation for the 1 Billion Row Challenge. \
 I know the competition was for Java initially and that it have ended, but I wanted to join the fun. \
-My implementation is in Golang/Go because, I'm much more familiar with it than I'm with Java. \
+My implementation is in Golang/Go because, I'm much more familiar with it than I'm with Java.
 
 ## Resources
 
@@ -14,4 +14,4 @@ My implementation is in Golang/Go because, I'm much more familiar with it than I
 [https://mrkaran.dev/posts/1brc/](https://mrkaran.dev/posts/1brc/) \
 [https://www.morling.dev/blog/one-billion-row-challenge/](https://www.morling.dev/blog/one-billion-row-challenge/) \
 [https://www.infoq.com/news/2024/01/1brc-fast-java-processing/](https://www.infoq.com/news/2024/01/1brc-fast-java-processing/) \
-[https://ftisiot.net/posts/1brows/](https://ftisiot.net/posts/1brows/) \
+[https://ftisiot.net/posts/1brows/](https://ftisiot.net/posts/1brows/)
