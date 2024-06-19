@@ -15,3 +15,7 @@ My implementation is in Golang/Go because, I'm much more familiar with it than I
 [https://www.morling.dev/blog/one-billion-row-challenge/](https://www.morling.dev/blog/one-billion-row-challenge/) \
 [https://www.infoq.com/news/2024/01/1brc-fast-java-processing/](https://www.infoq.com/news/2024/01/1brc-fast-java-processing/) \
 [https://ftisiot.net/posts/1brows/](https://ftisiot.net/posts/1brows/)
+
+## Results
+
+Fastest run of my current program with 8 threads is 2m 15s for the 1 billion lines file.

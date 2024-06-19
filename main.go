@@ -20,69 +20,84 @@ type Station struct {
 	max  float64
 }
 
-func processFile(path string, threads int) int {
-	ch := make(chan map[string]Station)
+func processFile(path string, threads int, chunkSize int) int {
+	ch := make(chan map[string]Station, threads)
 	var wg sync.WaitGroup
+
 	file, err := os.Open(path)
 	if err != nil {
 		log.Fatal(err)
 	}
 	defer file.Close()
 
-	scanner := bufio.NewScanner(file)
+	reader := bufio.NewReader(file)
+
 	lines := make([]string, 0)
 
-	for scanner.Scan() {
-		lines = append(lines, scanner.Text())
-	}
-
-	if err := scanner.Err(); err != nil {
-		log.Fatal(err)
-	}
-
-	length := len(lines)
-	partSize := int(math.Ceil(float64(length) / float64(threads)))
-
-	for i := 0; i < length; i += partSize {
-		end := i + partSize
-		if end > length {
-			end = length
+	for {
+		line, err := reader.ReadString('\n')
+		if err != nil {
+			if err.Error() != "EOF" {
+				log.Fatal(err)
+			}
+			if len(lines) > 0 {
+				wg.Add(1)
+				go processChunk(lines, ch, &wg)
+			}
+			break
 		}
-		chunk := lines[i:end]
-		wg.Add(1)
-		go processChunk(chunk, ch, &wg)
-	}
 
-	i := 1
-	uniqueStations := 0
+		lines = append(lines, strings.TrimSpace(line))
+
+		if len(lines) >= chunkSize {
+			wg.Add(1)
+			go processChunk(lines, ch, &wg)
+			lines = make([]string, 0)
+		}
+	}
 
 	go func() {
 		wg.Wait()
 		close(ch)
 	}()
 
-	fmt.Print("{ ")
-	for stations := range ch {
-		uniqueStations += len(stations)
-	}
+	aggregatedStations := make(map[string]Station)
 
 	for stations := range ch {
 		for name, station := range stations {
-			fmt.Printf("%s=%.1f/%.1f/%.1f", name, math.Round(station.min*10)/10, math.Round(station.mean*10)/10, math.Round(station.max*10)/10)
-			if i < uniqueStations {
-				fmt.Print(", ")
+			if existing, found := aggregatedStations[name]; found {
+				if station.min < existing.min {
+					existing.min = station.min
+				}
+				if station.max > existing.max {
+					existing.max = station.max
+				}
+				existing.mean = (existing.min + existing.max) / 2
+				aggregatedStations[name] = existing
+			} else {
+				aggregatedStations[name] = station
 			}
-			i++
 		}
-		fmt.Println(" }")
 	}
 
-	return uniqueStations
+	i := 1
+	fmt.Print("{ ")
+	for name, station := range aggregatedStations {
+		fmt.Printf("%s=%.1f/%.1f/%.1f", name, math.Round(station.min*10)/10, math.Round(station.mean*10)/10, math.Round(station.max*10)/10)
+		if i < len(aggregatedStations) {
+			fmt.Print(", ")
+		}
+		i++
+	}
+	fmt.Println(" }")
+
+	return len(aggregatedStations)
 }
 
 func processChunk(chunk []string, ch chan<- map[string]Station, wg *sync.WaitGroup) {
-	stations := make(map[string]Station)
 	defer wg.Done()
+
+	stations := make(map[string]Station)
 
 	for _, line := range chunk {
 		parts := strings.SplitN(line, ";", 2)
@@ -91,15 +106,21 @@ func processChunk(chunk []string, ch chan<- map[string]Station, wg *sync.WaitGro
 		if err != nil {
 			log.Fatal(err)
 		}
-		station := stations[name]
-		if measurement > station.max {
-			station.max = measurement
-			stations[name] = station
-		}
-		if measurement < station.min {
+
+		station, found := stations[name]
+
+		if !found {
 			station.min = measurement
-			stations[name] = station
+			station.max = measurement
+		} else {
+			if measurement > station.max {
+				station.max = measurement
+			}
+			if measurement < station.min {
+				station.min = measurement
+			}
 		}
+
 		station.mean = (station.min + station.max) / 2
 		stations[name] = station
 	}
@@ -109,20 +130,22 @@ func processChunk(chunk []string, ch chan<- map[string]Station, wg *sync.WaitGro
 
 func main() {
 	var file string
-	var threads int
+	var threads, chunkSize int
+
 	flag.StringVar(&file, "file", "measurements.txt", "The file to take the measurements from")
 	flag.IntVar(&threads, "threads", runtime.NumCPU(), "How many threads to spawn")
+	flag.IntVar(&chunkSize, "chunkSize", 1000000, "How many chunkSize to spawn")
 	flag.Parse()
 
 	runtime.GOMAXPROCS(threads)
 
 	start := time.Now()
 
-	numberOfStations := processFile(file, threads)
+	uniqueStations := processFile(file, threads, chunkSize)
 
 	end := time.Now()
 	duration := end.Sub(start)
 
-	fmt.Printf("Unique Stations: %d\n", numberOfStations)
+	fmt.Printf("Unique stations: %d\n", uniqueStations)
 	fmt.Printf("Execution time: %v\n", duration)
 }
