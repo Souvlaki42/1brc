@@ -4,7 +4,30 @@ This is my implementation for the 1 Billion Row Challenge. \
 I know the competition was for Java initially and that it have ended, but I wanted to join the fun. \
 My implementation is in Golang/Go because, I'm much more familiar with it than I'm with Java.
 
+## Setup
+- Install java 21:
+```bash
+sudo pacman -S jdk21-openjdk
+```
+- Clone or fork the repo:
+```bash
+git clone https://github.com/gunnarmorling/1brc.git 1brc-repo
+```
+- Go inside the repo and build the test data generator:
+```bash
+cd ./1brc-repo
+./mvnw clean verify
+```
+- Generate the test data:
+```bash
+# You can pass any number of bytes
+# The 1B row file is about 14GB in size
+./create_measurements.sh 1000000000
+```
+- Run the program
+
 ## Resources
+[https://benhoyt.com/writings/go-1brc/](https://benhoyt.com/writings/go-1brc/)
 [https://youtu.be/O1IFQav9FQg?si=uBaalVeGkevBOWT4](https://youtu.be/O1IFQav9FQg?si=uBaalVeGkevBOWT4) \
 [https://youtu.be/e_9ziFKcEhw?si=GmluAFpm5fslQdvl](https://youtu.be/e_9ziFKcEhw?si=GmluAFpm5fslQdvl) \
 [https://github.com/gunnarmorling/1brc](https://github.com/gunnarmorling/1brc) \
@@ -23,4 +46,4 @@ Each station name is less than or equal to 100 bytes long while they are at most
 
 ## Results
 
-Fastest run of my current program is 24s for the 1 billion lines file.
+Fastest run of my current program is 10s for the 1 billion lines file.

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"fmt"
 	"os"
 	"runtime"
@@ -21,6 +22,18 @@ type MemoryChunk struct {
 	end   int
 }
 
+type HashBucket struct {
+	key   []byte
+	value *Measurement
+}
+
+const (
+	// FNV-1 64-bit constants from hash/fnv.
+	offset64   = 14695981039346656037
+	prime64    = 1099511628211
+	numBuckets = 1 << 17 // 2^17
+)
+
 func splitMemory(memory mmap.MMap, n int) []MemoryChunk {
 	total := len(memory)
 	chunkSize := total / n
@@ -40,27 +53,32 @@ func splitMemory(memory mmap.MMap, n int) []MemoryChunk {
 	return chunks
 }
 
-func readMemoryChannel(ch chan map[string]*Measurement, data mmap.MMap, start int, end int) {
-	station := ""
+func readMemoryChunk(ch chan map[string]*Measurement, data mmap.MMap, start int, end int) {
 	temperature := 0
 	prev := start
-	measurements := make(map[string]*Measurement)
+	hash := uint64(offset64)
+	buckets := make([]HashBucket, numBuckets) // hash buckets, linearly probed.
+	active := 0                               // number of active buckets.
+
 	for i := start; i <= end; i++ {
+		hash ^= uint64(data[i]) // FNV-1a is XOR then *
+		hash *= prime64
+
 		if data[i] == ';' {
-			station = string(data[prev:i])
+			station := data[prev:i]
 			temperature = 0
-			i += 1
+			i++
 			negative := false
 
 			for data[i] != '\n' {
 				ch := data[i]
 				if ch == '.' {
-					i += 1
+					i++
 					continue
 				}
 				if ch == '-' {
 					negative = true
-					i += 1
+					i++
 					continue
 				}
 				ch -= '0'
@@ -68,33 +86,63 @@ func readMemoryChannel(ch chan map[string]*Measurement, data mmap.MMap, start in
 					panic("Invalid character")
 				}
 				temperature = temperature*10 + int(ch)
-				i += 1
+				i++
 			}
 
 			if negative {
 				temperature = -temperature
 			}
 
-			measurement := measurements[station]
-			if measurement == nil {
-				measurements[station] = &Measurement{
-					Min:   temperature,
-					Max:   temperature,
-					Sum:   int64(temperature),
-					Count: 1,
+			// Go to correct bucket in hash table.
+			hashIndex := int(hash & uint64(numBuckets-1))
+			for {
+				if buckets[hashIndex].key == nil {
+					// Found empty slot, add new item (copying key).
+					buckets[hashIndex] = HashBucket{
+						key: station,
+						value: &Measurement{
+							Min:   temperature,
+							Max:   temperature,
+							Sum:   int64(temperature),
+							Count: 1,
+						},
+					}
+					active++
+					if active > numBuckets/2 {
+						panic("Too many items in hash table.")
+					}
+					break
 				}
-			} else {
-				measurement.Min = min(measurement.Min, temperature)
-				measurement.Max = max(measurement.Max, temperature)
-				measurement.Sum += int64(temperature)
-				measurement.Count += 1
+				if bytes.Equal(buckets[hashIndex].key, station) {
+					// Found matching slot, add to existing value.
+					s := buckets[hashIndex].value
+					s.Min = min(s.Min, temperature)
+					s.Max = max(s.Max, temperature)
+					s.Sum += int64(temperature)
+					s.Count++
+					break
+				}
+				// Slot already holds another key, try next slot (linear probe).
+				hashIndex++
+				if hashIndex >= numBuckets {
+					hashIndex = 0
+				}
 			}
 
 			prev = i + 1
-			station = ""
 			temperature = 0
+			hash = uint64(offset64)
 		}
 	}
+
+	measurements := make(map[string]*Measurement)
+	for _, bucket := range buckets {
+		if bucket.key == nil {
+			continue
+		}
+		measurements[string(bucket.key)] = bucket.value
+	}
+
 	ch <- measurements
 }
 
@@ -118,7 +166,7 @@ func main() {
 	measurementChan := make(chan map[string]*Measurement)
 
 	for i := 0; i < maxGoroutines; i++ {
-		go readMemoryChannel(measurementChan, data, chunks[i].start, chunks[i].end)
+		go readMemoryChunk(measurementChan, data, chunks[i].start, chunks[i].end)
 	}
 
 	for i := 0; i < maxGoroutines; i++ {
