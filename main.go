@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"os"
+	"runtime"
 	"slices"
 
 	"github.com/edsrzf/mmap-go"
@@ -15,25 +16,36 @@ type Measurement struct {
 	Count int
 }
 
-func main() {
-	dataFile, err := os.Open("./1brc-repo/measurements.txt")
-	if err != nil {
-		panic(err)
-	}
-	defer dataFile.Close()
+type MemoryChunk struct {
+	start int
+	end   int
+}
 
-	data, err := mmap.Map(dataFile, mmap.RDONLY, 0)
-	if err != nil {
-		panic(err)
-	}
-	defer data.Unmap()
+func splitMemory(memory mmap.MMap, n int) []MemoryChunk {
+	total := len(memory)
+	chunkSize := total / n
+	chunks := make([]MemoryChunk, n)
 
+	chunks[0].start = 0
+	for i := 1; i < n; i++ {
+		for j := i * chunkSize; j < i*chunkSize+50; j++ {
+			if memory[j] == '\n' {
+				chunks[i-1].end = j
+				chunks[i].start = j + 1
+				break
+			}
+		}
+	}
+	chunks[n-1].end = total - 1
+	return chunks
+}
+
+func readMemoryChannel(ch chan map[string]*Measurement, data mmap.MMap, start int, end int) {
 	station := ""
 	temperature := 0
-	prev := 0
-	total := len(data)
+	prev := start
 	measurements := make(map[string]*Measurement)
-	for i := 0; i < total; i++ {
+	for i := start; i <= end; i++ {
 		if data[i] == ';' {
 			station = string(data[prev:i])
 			temperature = 0
@@ -83,7 +95,48 @@ func main() {
 			temperature = 0
 		}
 	}
-	printResults(measurements)
+	ch <- measurements
+}
+
+func main() {
+	maxGoroutines := min(runtime.NumCPU(), runtime.GOMAXPROCS(0))
+
+	dataFile, err := os.Open("./1brc-repo/measurements.txt")
+	if err != nil {
+		panic(err)
+	}
+	defer dataFile.Close()
+
+	data, err := mmap.Map(dataFile, mmap.RDONLY, 0)
+	if err != nil {
+		panic(err)
+	}
+	defer data.Unmap()
+
+	chunks := splitMemory(data, maxGoroutines)
+	totals := make(map[string]*Measurement)
+	measurementChan := make(chan map[string]*Measurement)
+
+	for i := 0; i < maxGoroutines; i++ {
+		go readMemoryChannel(measurementChan, data, chunks[i].start, chunks[i].end)
+	}
+
+	for i := 0; i < maxGoroutines; i++ {
+		measurements := <-measurementChan
+		for station, measurement := range measurements {
+			total := totals[station]
+			if total == nil {
+				totals[station] = measurement
+			} else {
+				total.Min = min(total.Min, measurement.Min)
+				total.Max = max(total.Max, measurement.Max)
+				total.Sum += measurement.Sum
+				total.Count += measurement.Count
+			}
+		}
+	}
+
+	printResults(totals)
 }
 
 func printResults(results map[string]*Measurement) {
