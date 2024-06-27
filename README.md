@@ -8,7 +8,7 @@ My implementation is in Golang/Go because, I'm much more familiar with it than I
 
 [https://youtu.be/e_9ziFKcEhw?si=GmluAFpm5fslQdvl](https://youtu.be/e_9ziFKcEhw?si=GmluAFpm5fslQdvl) \
 [https://github.com/gunnarmorling/1brc](https://github.com/gunnarmorling/1brc) \
-[https://github.com/shraddhaag/1brc/](https://github.com/shraddhaag/1brc/)
+[https://github.com/shraddhaag/1brc/](https://github.com/shraddhaag/1brc/) \
 [https://rmoff.net/2024/01/03/1%EF%B8%8F%E2%83%A3%EF%B8%8F-1brc-in-sql-with-duckdb/](https://rmoff.net/2024/01/03/1%EF%B8%8F%E2%83%A3%EF%B8%8F-1brc-in-sql-with-duckdb/) \
 [https://mrkaran.dev/posts/1brc/](https://mrkaran.dev/posts/1brc/) \
 [https://www.morling.dev/blog/one-billion-row-challenge/](https://www.morling.dev/blog/one-billion-row-challenge/) \
