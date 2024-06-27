@@ -1,18 +1,17 @@
 package main
 
 import (
-	"bufio"
 	"fmt"
 	"os"
 	"slices"
-	"strconv"
-	"strings"
+
+	"github.com/edsrzf/mmap-go"
 )
 
 type Measurement struct {
-	Min   float64
-	Max   float64
-	Sum   float64
+	Min   int
+	Max   int
+	Sum   int64
 	Count int
 }
 
@@ -23,38 +22,67 @@ func main() {
 	}
 	defer dataFile.Close()
 
+	data, err := mmap.Map(dataFile, mmap.RDONLY, 0)
+	if err != nil {
+		panic(err)
+	}
+	defer data.Unmap()
+
+	station := ""
+	temperature := 0
+	prev := 0
+	total := len(data)
 	measurements := make(map[string]*Measurement)
+	for i := 0; i < total; i++ {
+		if data[i] == ';' {
+			station = string(data[prev:i])
+			temperature = 0
+			i += 1
+			negative := false
 
-	fileScanner := bufio.NewScanner(dataFile)
-	fileScanner.Split(bufio.ScanLines)
-
-	for fileScanner.Scan() {
-		rawString := fileScanner.Text()
-		stationName, temperatureStr, found := strings.Cut(rawString, ";")
-		if !found {
-			continue
-		}
-		temperature, err := strconv.ParseFloat(temperatureStr, 32)
-		if err != nil {
-			panic(err)
-		}
-
-		measurement := measurements[stationName]
-		if measurement == nil {
-			measurements[stationName] = &Measurement{
-				Min:   temperature,
-				Max:   temperature,
-				Sum:   temperature,
-				Count: 1,
+			for data[i] != '\n' {
+				ch := data[i]
+				if ch == '.' {
+					i += 1
+					continue
+				}
+				if ch == '-' {
+					negative = true
+					i += 1
+					continue
+				}
+				ch -= '0'
+				if ch > 9 {
+					panic("Invalid character")
+				}
+				temperature = temperature*10 + int(ch)
+				i += 1
 			}
-		} else {
-			measurement.Min = min(measurement.Min, temperature)
-			measurement.Max = max(measurement.Max, temperature)
-			measurement.Sum += temperature
-			measurement.Count += 1
+
+			if negative {
+				temperature = -temperature
+			}
+
+			measurement := measurements[station]
+			if measurement == nil {
+				measurements[station] = &Measurement{
+					Min:   temperature,
+					Max:   temperature,
+					Sum:   int64(temperature),
+					Count: 1,
+				}
+			} else {
+				measurement.Min = min(measurement.Min, temperature)
+				measurement.Max = max(measurement.Max, temperature)
+				measurement.Sum += int64(temperature)
+				measurement.Count += 1
+			}
+
+			prev = i + 1
+			station = ""
+			temperature = 0
 		}
 	}
-
 	printResults(measurements)
 }
 
@@ -69,9 +97,10 @@ func printResults(results map[string]*Measurement) {
 	fmt.Printf("{")
 	for idx, stationName := range stationNames {
 		measurement := results[stationName]
-		mean := measurement.Sum / float64(measurement.Count)
-		fmt.Printf("%s=%.1f/%.1f/%.1f",
-			stationName, measurement.Min, mean, measurement.Max)
+		mean := float64(measurement.Sum/10) / float64(measurement.Count)
+		max := float64(measurement.Max) / 10
+		min := float64(measurement.Min) / 10
+		fmt.Printf("%s=%.1f/%.1f/%.1f", stationName, min, mean, max)
 		if idx < len(stationNames)-1 {
 			fmt.Printf(", ")
 		}
