@@ -2,10 +2,12 @@ package main
 
 import (
 	"bytes"
+	"flag"
 	"fmt"
 	"os"
 	"runtime"
 	"slices"
+	"time"
 
 	"github.com/edsrzf/mmap-go"
 )
@@ -33,6 +35,84 @@ const (
 	prime64    = 1099511628211
 	numBuckets = 1 << 17 // 2^17
 )
+
+func main() {
+	maxGoroutines := min(runtime.NumCPU(), runtime.GOMAXPROCS(0))
+
+	var fileName string
+	var hideResults bool
+
+	flag.StringVar(&fileName, "f", "measurements.txt", "Filename that points to your measurements file")
+	flag.BoolVar(&hideResults, "hr", false, "If you pass that flag the results of the program will be hidden")
+
+	flag.Parse()
+
+	start := time.Now()
+
+	dataFile, err := os.Open(fileName)
+	if err != nil {
+		panic(err)
+	}
+	defer dataFile.Close()
+
+	data, err := mmap.Map(dataFile, mmap.RDONLY, 0)
+	if err != nil {
+		panic(err)
+	}
+	defer data.Unmap()
+
+	chunks := splitMemory(data, maxGoroutines)
+	totals := make(map[string]*Measurement)
+	measurementChan := make(chan map[string]*Measurement)
+
+	for i := 0; i < maxGoroutines; i++ {
+		go readMemoryChunk(measurementChan, data, chunks[i].start, chunks[i].end)
+	}
+
+	for i := 0; i < maxGoroutines; i++ {
+		measurements := <-measurementChan
+		for station, measurement := range measurements {
+			total := totals[station]
+			if total == nil {
+				totals[station] = measurement
+			} else {
+				total.Min = min(total.Min, measurement.Min)
+				total.Max = max(total.Max, measurement.Max)
+				total.Sum += measurement.Sum
+				total.Count += measurement.Count
+			}
+		}
+	}
+	elapsed := time.Since(start)
+
+	if !hideResults {
+		printResults(totals)
+	}
+
+	fmt.Printf("This 1brc code took %s to run\n", elapsed)
+}
+
+func printResults(results map[string]*Measurement) {
+	stationNames := make([]string, 0, len(results))
+	for stationName := range results {
+		stationNames = append(stationNames, stationName)
+	}
+
+	slices.Sort(stationNames)
+
+	fmt.Printf("{")
+	for idx, stationName := range stationNames {
+		measurement := results[stationName]
+		mean := float64(measurement.Sum/10) / float64(measurement.Count)
+		max := float64(measurement.Max) / 10
+		min := float64(measurement.Min) / 10
+		fmt.Printf("%s=%.1f/%.1f/%.1f", stationName, min, mean, max)
+		if idx < len(stationNames)-1 {
+			fmt.Printf(", ")
+		}
+	}
+	fmt.Printf("}\n")
+}
 
 func splitMemory(memory mmap.MMap, n int) []MemoryChunk {
 	total := len(memory)
@@ -144,67 +224,4 @@ func readMemoryChunk(ch chan map[string]*Measurement, data mmap.MMap, start int,
 	}
 
 	ch <- measurements
-}
-
-func main() {
-	maxGoroutines := min(runtime.NumCPU(), runtime.GOMAXPROCS(0))
-
-	dataFile, err := os.Open("./1brc-repo/measurements.txt")
-	if err != nil {
-		panic(err)
-	}
-	defer dataFile.Close()
-
-	data, err := mmap.Map(dataFile, mmap.RDONLY, 0)
-	if err != nil {
-		panic(err)
-	}
-	defer data.Unmap()
-
-	chunks := splitMemory(data, maxGoroutines)
-	totals := make(map[string]*Measurement)
-	measurementChan := make(chan map[string]*Measurement)
-
-	for i := 0; i < maxGoroutines; i++ {
-		go readMemoryChunk(measurementChan, data, chunks[i].start, chunks[i].end)
-	}
-
-	for i := 0; i < maxGoroutines; i++ {
-		measurements := <-measurementChan
-		for station, measurement := range measurements {
-			total := totals[station]
-			if total == nil {
-				totals[station] = measurement
-			} else {
-				total.Min = min(total.Min, measurement.Min)
-				total.Max = max(total.Max, measurement.Max)
-				total.Sum += measurement.Sum
-				total.Count += measurement.Count
-			}
-		}
-	}
-
-	printResults(totals)
-}
-
-func printResults(results map[string]*Measurement) {
-	stationNames := make([]string, 0, len(results))
-	for stationName := range results {
-		stationNames = append(stationNames, stationName)
-	}
-
-	slices.Sort(stationNames)
-
-	fmt.Printf("{")
-	for idx, stationName := range stationNames {
-		measurement := results[stationName]
-		mean := float64(measurement.Sum/10) / float64(measurement.Count)
-		max := float64(measurement.Max) / 10
-		min := float64(measurement.Min) / 10
-		fmt.Printf("%s=%.1f/%.1f/%.1f", stationName, min, mean, max)
-		if idx < len(stationNames)-1 {
-			fmt.Printf(", ")
-		}
-	}
-	fmt.Printf("}\n")
 }
