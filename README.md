@@ -65,3 +65,6 @@ Each station name is less than or equal to 100 bytes long while they are at most
 
 Fastest run of my current program is 11s for the 1 billion lines file.
 
+## Unlicense
+
+This project is released into the public domain. See the [UNLICENSE](UNLICENSE) file for details.
