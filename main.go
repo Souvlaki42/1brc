@@ -7,7 +7,6 @@ import (
 	"os"
 	"runtime"
 	"slices"
-	"time"
 
 	"github.com/edsrzf/mmap-go"
 )
@@ -47,8 +46,6 @@ func main() {
 
 	flag.Parse()
 
-	start := time.Now()
-
 	dataFile, err := os.Open(fileName)
 	if err != nil {
 		panic(err)
@@ -83,13 +80,10 @@ func main() {
 			}
 		}
 	}
-	elapsed := time.Since(start)
 
 	if !hideResults {
 		printResults(totals)
 	}
-
-	fmt.Printf("This 1brc code took %s to run\n", elapsed)
 }
 
 func printResults(results map[string]*Measurement) {
