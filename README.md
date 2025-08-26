@@ -1,69 +1,70 @@
-# 1 Billion Row Challenge
+# 1 Billion Row Challenge in Go
 
-This is my implementation for the 1 Billion Row Challenge. \
-I know the competition was for Java initially and that it have ended, but I wanted to join the fun. \
-My implementation is in Golang because, I'm much more familiar with it than I'm with Java.
-
-## Setup
-
-- Install [Java 21 on your platform of choice](https://www.oracle.com/java/technologies/downloads/#jdk21-windows) or though your package manager (set **JAVA_HOME** if it isn't set) and also [Golang](https://golang.google.cn/):
-
-```bash
-sudo pacman -S jdk21-openjdk
-sudo pacman -S go
-```
-
-- Clone or fork the official 1brc repo:
-
-```bash
-git clone https://github.com/gunnarmorling/1brc.git 1brc-repo
-```
-
-- Go inside the repo and build the test data generator:
-
-```bash
-cd ./1brc-repo
-./mvnw clean verify
-```
-
-- Generate the test data:
-
-```bash
-# You can pass any number of bytes
-# The 1B row file is about 14GB in size
-./create_measurements.sh 1000000000
-```
-
-- Run the program:
-
-```bash
-go run . # Default run
-go run . -f {measurements file} # If you want to change the measurements file location
-go run . -hr # If you want to hide the results output
-```
-
-## Resources
-
-[https://benhoyt.com/writings/go-1brc/](https://benhoyt.com/writings/go-1brc/)
-[https://youtu.be/O1IFQav9FQg?si=uBaalVeGkevBOWT4](https://youtu.be/O1IFQav9FQg?si=uBaalVeGkevBOWT4) \
-[https://youtu.be/e_9ziFKcEhw?si=GmluAFpm5fslQdvl](https://youtu.be/e_9ziFKcEhw?si=GmluAFpm5fslQdvl) \
-[https://github.com/gunnarmorling/1brc](https://github.com/gunnarmorling/1brc) \
-[https://github.com/shraddhaag/1brc/](https://github.com/shraddhaag/1brc/) \
-[https://rmoff.net/2024/01/03/1%EF%B8%8F%E2%83%A3%EF%B8%8F-1brc-in-sql-with-duckdb/](https://rmoff.net/2024/01/03/1%EF%B8%8F%E2%83%A3%EF%B8%8F-1brc-in-sql-with-duckdb/) \
-[https://mrkaran.dev/posts/1brc/](https://mrkaran.dev/posts/1brc/) \
-[https://www.morling.dev/blog/one-billion-row-challenge/](https://www.morling.dev/blog/one-billion-row-challenge/) \
-[https://www.infoq.com/news/2024/01/1brc-fast-java-processing/](https://www.infoq.com/news/2024/01/1brc-fast-java-processing/) \
-[https://ftisiot.net/posts/1brows/](https://ftisiot.net/posts/1brows/)
-
-## Constraints
-
-The temperatures are between -99.9 and 99.9 and they have exactly one fractional digit. \
-Rounding should be done using the semantics of IEEE 754 with a rounding direction 'round toward positive'. \
-Each station name is less than or equal to 100 bytes long while they are at most 10000 unique stations in the file.
+This is my implementation for the 1 Billion Row Challenge. I know the competition was for Java and has ended, but I wanted to join the fun. My implementation is in Golang, as I am more familiar with it than I'm with Java.
 
 ## Results
 
-Fastest run of my current program is 11s for the 1 billion lines file.
+My best average run on my 4-core, 16GB RAM machine is **11s**.
+
+## Benchmarking
+
+This repository includes an automated benchmarking script that handles setup, execution, and correctness checking.
+
+**Prerequisites:**
+*   Go (1.22+)
+*   Java (21+) with `JAVA_HOME` set
+*   Git, `sudo` access (for clearing caches), and `bc`
+*   Optionaly, ripgrep as a faster replacement for grep
+
+**To run the benchmark:**
+
+```bash
+# Make the script executable first
+chmod +x benchmark.sh
+
+# Run it!
+./benchmark.sh
+```
+
+The script will automatically:
+1.  Check for all required dependencies.
+2.  Build the Go program.
+3.  If necessary, clone the original 1BRC repository to generate the `measurements.txt` data file and the `solution.txt` file using the baseline Java implementation.
+4.  Run your Go implementation multiple times, clearing the OS file cache before each run for consistent results.
+5.  Check the output against the correct solution file.
+6.  Calculate the average time between all of the runs.
+
+## Manual Development
+
+If you want to run the program manually for development or debugging:
+
+```bash
+# Run with default settings
+go run main.go
+
+# Specify a different measurements file
+go run main.go -f path/to/your/measurements.txt
+```
+
+## Constraints
+
+*   Temperatures are between -99.9 and 99.9 with exactly one fractional digit.
+*   Station names are ≤ 100 bytes, with at most 10,000 unique stations.
+*   Rounding follows IEEE 754 semantics ('round toward positive').
+
+## Resources
+
+A collection of useful links and articles related to the 1BRC.
+*   [The One Billion Row Challenge](https://www.morling.dev/blog/one-billion-row-challenge/)
+*   [A fun exploration of how quickly 1B rows from a text file can be aggregated with Java](https://github.com/gunnarmorling/1brc)
+*   [The One Billion Row Challenge in Go: from 1m45s to 3.4s in nine solutions](https://benhoyt.com/writings/go-1brc/)
+*   [Solution to One Billion Rows Challenge in Golang.](https://github.com/shraddhaag/1brc/)
+*   [Why should the Java folk have all the fun?!](https://rmoff.net/2024/01/03/1%EF%B8%8F%E2%83%A3%EF%B8%8F-1brc-in-sql-with-duckdb/)
+*   [One Billion Row Challenge in Go](https://mrkaran.dev/posts/1brc/)
+*   [The One Billion Row Challenge Shows That Java Can Process a One Billion Rows File in Two Seconds](https://www.infoq.com/news/2024/01/1brc-fast-java-processing/)
+*   [1 billion rows challenge in PostgreSQL and ClickHouse](https://ftisiot.net/posts/1brows/)
+*   [1 BILLION row challenge in Go - 2.5 Seconds!](https://youtu.be/O1IFQav9FQg)
+*   [I Parsed 1 Billion Rows Of Text (It Sucked)](https://youtu.be/e_9ziFKcEhw)
 
 ## Unlicense
 
